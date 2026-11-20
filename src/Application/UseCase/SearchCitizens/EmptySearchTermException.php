@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Application\UseCase\SearchCitizens;
 
-use App\Domain\Exception\DomainException;
+use InvalidArgumentException;
 
-final class EmptySearchTermException extends DomainException
+final class EmptySearchTermException extends InvalidArgumentException
 {
     public static function create(): self
     {

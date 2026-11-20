@@ -31,7 +31,7 @@ O coração do sistema: as regras de negócio, em PHP puro, sem dependências.
 | Elemento | Papel |
 |---|---|
 | `Shared/ValueObject/Cpf` | Remove a máscara, valida tamanho, sequências repetidas e os dois dígitos verificadores. Expõe `value()` (só dígitos) e `formatted()` (`000.000.000-00`). |
-| `Shared/ValueObject/FullName` | Normaliza espaços, exige nome e sobrenome, limita a 150 caracteres e aceita só letras (com acentos), espaço, apóstrofo e hífen. |
+| `Shared/ValueObject/FullName` | Normaliza espaços, exige nome e sobrenome, limita a 150 caracteres e aceita só letras (com acentos), espaço, apóstrofo e hífen. Expõe `value()` e `initials()` (as iniciais do avatar na busca). |
 | `Shared/ValueObject/BrazilianState` | Enum com as 27 UFs. `fromCode()` aceita a sigla em qualquer caixa e rejeita o que não for uma UF. |
 | `Citizen/Citizen` | Entidade imutável (id, nome, CPF, estado, data de criação). |
 | `Citizen/CitizenRepository` | **Porta**: interface que descreve o que o domínio precisa da persistência. |
@@ -65,7 +65,7 @@ entrada HTTP.
 |---|---|
 | `Persistence` | **Adaptadores** do repositório: `PdoCitizenRepository` (MySQL, só prepared statements) e `InMemoryCitizenRepository` (testes). `Connection` cria o PDO. |
 | `Http` | `Request`, `Response`, `Router`, `Session` (flash e CSRF) e `HttpException`: um mini-framework próprio, já que o desafio proíbe frameworks. |
-| `View` | `ViewRenderer` (templates em PHP puro) e os helpers `e()` (escape) e `initials()` (iniciais do avatar). |
+| `View` | `ViewRenderer` (templates em PHP puro e URLs versionadas dos assets via `asset()`) e o helper `e()` de escape. |
 | `Config` | Leitura das variáveis de ambiente. |
 | `Container.php` | Composição manual de dependências: o único lugar que dá `new` nos serviços. |
 

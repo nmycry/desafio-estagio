@@ -61,7 +61,7 @@ declare(strict_types=1);
                                 <tr>
                                     <td>
                                         <div class="person">
-                                            <span class="avatar" aria-hidden="true"><?= e(initials($citizen->name->value())) ?></span>
+                                            <span class="avatar" aria-hidden="true"><?= e($citizen->name->initials()) ?></span>
                                             <span class="person__name"><?= e($citizen->name->value()) ?></span>
                                         </div>
                                     </td>

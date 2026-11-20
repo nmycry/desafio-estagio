@@ -163,8 +163,8 @@ requisição, estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
   `303` para `/`. A mensagem de sucesso, com nome, CPF formatado e UF (quando
   informada), viaja numa flash message na sessão. Recarregar a página não reenvia o formulário.
 - **Tratamento de erros:** exceções de domínio (CPF inválido, nome inválido,
-  estado inválido, duplicidade, busca vazia) viram mensagens amigáveis exibidas
-  abaixo do campo que causou o erro.
+  estado inválido, duplicidade) e a de busca vazia viram mensagens amigáveis
+  exibidas abaixo do campo que causou o erro.
   Erros inesperados são registrados no log e exibidos como uma página 500
   genérica, sem stack trace.
 - **Segurança:**

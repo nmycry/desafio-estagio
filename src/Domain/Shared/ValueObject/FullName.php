@@ -40,4 +40,14 @@ final readonly class FullName
     {
         return $this->value;
     }
+
+    /**
+     * First letter of the first and of the last name: "Maria da Silva" -> "MS".
+     */
+    public function initials(): string
+    {
+        $names = explode(' ', $this->value);
+
+        return mb_strtoupper(mb_substr($names[0], 0, 1) . mb_substr(end($names), 0, 1));
+    }
 }

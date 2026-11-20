@@ -39,6 +39,24 @@ final class FullNameTest extends TestCase
         self::assertSame('Maria da Silva', $name->value());
     }
 
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function initialsByName(): iterable
+    {
+        yield 'first and last name' => ['Maria Silva', 'MS'];
+        yield 'middle names and prepositions' => ['Maria da Conceição Souza', 'MS'];
+        yield 'accents' => ['érica ávila', 'ÉÁ'];
+        yield 'hyphen and apostrophe' => ["Ana-Clara D'Ávila", 'AD'];
+    }
+
+    #[Test]
+    #[DataProvider('initialsByName')]
+    public function itReturnsTheInitialsOfTheFirstAndLastName(string $name, string $initials): void
+    {
+        self::assertSame($initials, FullName::fromString($name)->initials());
+    }
+
     #[Test]
     public function itAcceptsTheMaximumLength(): void
     {

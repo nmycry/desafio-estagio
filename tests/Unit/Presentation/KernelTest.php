@@ -31,7 +31,7 @@ final class KernelTest extends TestCase
     protected function setUp(): void
     {
         $this->session = new Session($this->sessionStorage);
-        $this->view = new ViewRenderer(dirname(__DIR__, 3) . '/templates');
+        $this->view = new ViewRenderer(dirname(__DIR__, 3) . '/templates', dirname(__DIR__, 3) . '/public');
 
         $citizens = new InMemoryCitizenRepository();
         $controller = new CitizenController(
@@ -54,6 +54,15 @@ final class KernelTest extends TestCase
         self::assertStringContainsString('value="' . $this->session->csrfToken() . '"', $response->body);
         self::assertStringContainsString('<select id="state" name="state"', $response->body);
         self::assertStringNotContainsString('field--error', $response->body);
+    }
+
+    #[Test]
+    public function itVersionsTheAssetsByTheirModificationTime(): void
+    {
+        $page = $this->get('/')->body;
+
+        self::assertMatchesRegularExpression('#href="/assets/css/app\.css\?v=[1-9]\d*"#', $page);
+        self::assertMatchesRegularExpression('#src="/assets/js/app\.js\?v=[1-9]\d*"#', $page);
     }
 
     #[Test]

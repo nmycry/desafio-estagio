@@ -24,7 +24,7 @@ final readonly class Container
 
     public function kernel(): Kernel
     {
-        $view = new ViewRenderer($this->rootPath . '/templates');
+        $view = new ViewRenderer($this->rootPath . '/templates', $this->rootPath . '/public');
 
         return new Kernel(fn(): CitizenController => $this->citizenController($view), $view);
     }

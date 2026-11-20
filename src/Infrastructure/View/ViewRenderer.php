@@ -8,7 +8,10 @@ use Throwable;
 
 final readonly class ViewRenderer
 {
-    public function __construct(private string $templatesPath) {}
+    public function __construct(
+        private string $templatesPath,
+        private string $publicPath,
+    ) {}
 
     /**
      * Renders a page template wrapped in the layout.
@@ -39,5 +42,16 @@ final readonly class ViewRenderer
         }
 
         return (string) ob_get_clean();
+    }
+
+    /**
+     * Public URL of a file under public/, versioned by its modification time so
+     * browsers download it again whenever it changes: "/assets/app.css?v=1763647639".
+     */
+    public function asset(string $path): string
+    {
+        $file = $this->publicPath . $path;
+
+        return $path . '?v=' . (is_file($file) ? filemtime($file) : 0);
     }
 }
