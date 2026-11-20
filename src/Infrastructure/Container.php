@@ -12,20 +12,24 @@ use App\Infrastructure\Persistence\Connection;
 use App\Infrastructure\Persistence\PdoCitizenRepository;
 use App\Infrastructure\View\ViewRenderer;
 use App\Presentation\Controller\CitizenController;
+use App\Presentation\Kernel;
 
 /**
  * Manual dependency wiring: every object receives its collaborators
  * through the constructor, and this is the only place that creates them.
  */
-final class Container
+final readonly class Container
 {
-    private ?ViewRenderer $view = null;
+    public function __construct(private string $rootPath) {}
 
-    private ?Session $session = null;
+    public function kernel(): Kernel
+    {
+        $view = new ViewRenderer($this->rootPath . '/templates');
 
-    public function __construct(private readonly string $rootPath) {}
+        return new Kernel(fn(): CitizenController => $this->citizenController($view), $view);
+    }
 
-    public function citizenController(): CitizenController
+    private function citizenController(ViewRenderer $view): CitizenController
     {
         $config = Config::fromEnvironment();
         $citizens = new PdoCitizenRepository(Connection::create($config, $config->dbName));
@@ -33,18 +37,8 @@ final class Container
         return new CitizenController(
             new RegisterCitizen($citizens),
             new SearchCitizens($citizens),
-            $this->view(),
-            $this->session(),
+            $view,
+            Session::start(),
         );
-    }
-
-    public function view(): ViewRenderer
-    {
-        return $this->view ??= new ViewRenderer($this->rootPath . '/templates');
-    }
-
-    private function session(): Session
-    {
-        return $this->session ??= Session::start();
     }
 }

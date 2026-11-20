@@ -5,8 +5,10 @@ Aplicação em PHP 8.5 puro (sem framework) para cadastrar cidadãos brasileiros
 
 ## Requisitos
 
-- Docker e Docker Compose. Nada mais precisa estar instalado na máquina:
-  PHP, Composer e MySQL rodam nos containers.
+- Docker e Docker Compose (no macOS e no Windows, via Docker Desktop).
+- Git, para clonar o repositório.
+
+PHP, Composer e MySQL **não** precisam estar instalados: rodam dentro dos containers.
 
 ## Como rodar
 
@@ -21,9 +23,29 @@ Acesse <http://localhost:8080>.
 Na primeira subida o MySQL leva alguns segundos para inicializar. O container
 `app` só sobe depois que o healthcheck do banco passa.
 
-> **UID/GID:** o container roda com o mesmo UID/GID do seu usuário, para que
-> `vendor/` e os caches não fiquem com dono root. O padrão é 1000. Se `id -u` e
-> `id -g` retornarem outros valores, ajuste `UID` e `GID` no `.env` antes do build.
+> **UID/GID (Linux e macOS):** o container roda com o mesmo UID/GID do seu
+> usuário, para que `vendor/` e os caches não fiquem com dono root. O padrão é
+> 1000. Se `id -u` e `id -g` retornarem outros valores, ajuste `UID` e `GID` no
+> `.env` antes do build.
+
+### No Windows
+
+O comando `cp` não existe no Prompt de Comando (cmd). Para criar o `.env`:
+
+```bat
+copy .env.example .env
+```
+
+No PowerShell, `cp .env.example .env` funciona, porque `cp` é um atalho para
+`Copy-Item`. Os demais comandos (`docker compose ...`) são os mesmos, com o
+Docker Desktop aberto. `UID` e `GID` não precisam ser alterados, porque o
+Docker Desktop cuida das permissões.
+
+**Recomendado:** clone e rode o projeto **dentro do WSL2** (por exemplo, em
+`~/desafio-estagio` no terminal do Ubuntu), seguindo os mesmos comandos de
+Linux. Também funciona a partir de uma pasta do Windows (`C:\...`), mas o bind
+mount entre os sistemas de arquivos deixa a aplicação e os testes bem mais
+lentos.
 
 ### Por que `composer install` é um passo separado
 
@@ -46,8 +68,12 @@ docker compose exec app composer cs:check          # PHP-CS-Fixer (PER-CS), sem 
 docker compose exec app composer cs:fix            # aplica as correções de estilo
 ```
 
-Os testes de integração usam um banco separado, `citizens_test`, criado pelo
-mesmo script de inicialização. A tabela é zerada antes de cada teste.
+- **Unitários:** cobrem os value objects, os casos de uso e a camada HTTP.
+  Os testes HTTP passam requisições pelo `Kernel` e verificam status, redirect,
+  flash message, CSRF, escape da saída e páginas de erro, usando um
+  repositório em memória e uma sessão em array, sem servidor nem banco.
+- **Integração:** usam um banco separado, `citizens_test`, criado pelo mesmo
+  script de inicialização. A tabela é zerada antes de cada teste.
 
 ## Portas e banco de dados
 
@@ -78,17 +104,19 @@ src/
   Application/     casos de uso: RegisterCitizen (+ DTO de entrada) e SearchCitizens
   Infrastructure/  detalhes técnicos: PDO/MySQL, repositório em memória,
                    HTTP (Request, Response, Router, Session), views, config, container
-  Presentation/    CitizenController: traduz HTTP <-> casos de uso
+  Presentation/    Kernel (rotas + tratamento de erros) e CitizenController,
+                   que traduz HTTP <-> casos de uso
 public/            front controller (index.php), .htaccess e assets
 templates/         views em PHP puro (layout, páginas e partials)
 database/init/     schema criado na inicialização do MySQL
 docker/app/        Dockerfile (PHP 8.5 + Apache)
-tests/             Unit/ (sem banco) e Integration/ (MySQL)
+tests/             Unit/ (domínio, casos de uso e HTTP, sem banco) e Integration/ (MySQL)
 ```
 
 As dependências apontam sempre para dentro: o domínio não conhece nenhuma
 outra camada, a aplicação conhece só o domínio, e a infraestrutura implementa
-as interfaces definidas por eles.
+as interfaces definidas por eles. Os detalhes, com diagramas do fluxo de uma
+requisição, estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
 ## Decisões e padrões
 
@@ -111,8 +139,9 @@ as interfaces definidas por eles.
   dependências. `Container` é o único lugar que monta o grafo de objetos, de
   forma manual e explícita.
 - **Front Controller:** `public/index.php` é o único ponto de entrada. O
-  `.htaccess` reescreve as rotas para ele, e é ali que ficam o roteamento e o
-  tratamento centralizado de erros.
+  `.htaccess` reescreve as rotas para ele, e ele entrega a requisição ao
+  `Kernel`, onde ficam o roteamento e o tratamento centralizado de erros. Como
+  o `Kernel` é uma classe comum, os testes o exercitam sem servidor HTTP.
 - **Post/Redirect/Get:** depois de um cadastro bem-sucedido, a resposta é um
   `303` para `/`. A mensagem de sucesso, com nome e CPF formatado, viaja numa
   flash message na sessão. Recarregar a página não reenvia o formulário.
@@ -149,7 +178,8 @@ as interfaces definidas por eles.
 - Edição e exclusão de cadastros.
 - Busca por nome com índice FULLTEXT, ou por prefixo (`LIKE 'termo%'`), para
   aproveitar índice. O `LIKE '%termo%'` atual não usa o índice em `name`.
-- Testes de ponta a ponta da camada HTTP (controller + templates).
+- Testes de ponta a ponta no navegador (por exemplo, com Playwright), cobrindo
+  também a máscara e a validação de CPF em JavaScript.
 - Pipeline de CI rodando testes, PHPStan e PHP-CS-Fixer a cada push.
 - Migrations versionadas no lugar do script único de inicialização.
 - Cabeçalhos de segurança (Content-Security-Policy, X-Frame-Options).

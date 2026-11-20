@@ -10,7 +10,19 @@ final class Session
 
     private const string FLASH_PREFIX = 'flash.';
 
-    private function __construct() {}
+    /** @var array<array-key, mixed> */
+    private array $storage;
+
+    /**
+     * Works on the given array by reference: $_SESSION in production,
+     * a plain array in tests.
+     *
+     * @param array<array-key, mixed> $storage
+     */
+    public function __construct(array &$storage)
+    {
+        $this->storage = &$storage;
+    }
 
     public static function start(): self
     {
@@ -20,7 +32,7 @@ final class Session
             'use_strict_mode' => true,
         ]);
 
-        return new self();
+        return new self($_SESSION);
     }
 
     /**
@@ -30,7 +42,7 @@ final class Session
      */
     public function flash(string $key, array $data): void
     {
-        $_SESSION[self::FLASH_PREFIX . $key] = $data;
+        $this->storage[self::FLASH_PREFIX . $key] = $data;
     }
 
     /**
@@ -39,19 +51,19 @@ final class Session
     public function pullFlash(string $key): ?array
     {
         /** @var array<string, string>|null $data */
-        $data = $_SESSION[self::FLASH_PREFIX . $key] ?? null;
-        unset($_SESSION[self::FLASH_PREFIX . $key]);
+        $data = $this->storage[self::FLASH_PREFIX . $key] ?? null;
+        unset($this->storage[self::FLASH_PREFIX . $key]);
 
         return $data;
     }
 
     public function csrfToken(): string
     {
-        $token = $_SESSION[self::CSRF_KEY] ?? null;
+        $token = $this->storage[self::CSRF_KEY] ?? null;
 
         if (!is_string($token)) {
             $token = bin2hex(random_bytes(32));
-            $_SESSION[self::CSRF_KEY] = $token;
+            $this->storage[self::CSRF_KEY] = $token;
         }
 
         return $token;
