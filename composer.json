@@ -32,7 +32,8 @@
     "test:integration": "phpunit --testsuite integration",
     "analyse": "phpstan analyse --memory-limit=512M",
     "cs:check": "php-cs-fixer check --diff",
-    "cs:fix": "php-cs-fixer fix"
+    "cs:fix": "php-cs-fixer fix",
+    "seed": "php bin/seed.php"
   },
   "config": {
     "sort-packages": true

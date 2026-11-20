@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Presentation;
 
+use App\Application\UseCase\ListCitizens\ListCitizens;
 use App\Application\UseCase\RegisterCitizen\RegisterCitizen;
 use App\Application\UseCase\SearchCitizens\SearchCitizens;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
 use App\Infrastructure\Http\Session;
+use App\Infrastructure\Persistence\CitizenSeeder;
 use App\Infrastructure\Persistence\InMemoryCitizenRepository;
 use App\Infrastructure\View\ViewRenderer;
 use App\Presentation\Controller\CitizenController;
 use App\Presentation\Kernel;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -28,15 +31,19 @@ final class KernelTest extends TestCase
 
     private ViewRenderer $view;
 
+    private RegisterCitizen $registerCitizen;
+
     protected function setUp(): void
     {
         $this->session = new Session($this->sessionStorage);
         $this->view = new ViewRenderer(dirname(__DIR__, 3) . '/templates');
 
         $citizens = new InMemoryCitizenRepository();
+        $this->registerCitizen = new RegisterCitizen($citizens);
         $controller = new CitizenController(
-            new RegisterCitizen($citizens),
+            $this->registerCitizen,
             new SearchCitizens($citizens),
+            new ListCitizens($citizens),
             $this->view,
             $this->session,
         );
@@ -120,14 +127,84 @@ final class KernelTest extends TestCase
     }
 
     #[Test]
-    public function itShowsOnlyTheSearchFormBeforeSearching(): void
+    public function itTellsWhenNoCitizenIsRegisteredYet(): void
     {
         $response = $this->get('/pesquisa');
 
         self::assertSame(200, $response->status);
         self::assertStringContainsString('method="get" action="/pesquisa"', $response->body);
+        self::assertStringContainsString('Nenhum cidadão cadastrado ainda', $response->body);
         self::assertStringNotContainsString('<table', $response->body);
-        self::assertStringNotContainsString('role="alert"', $response->body);
+    }
+
+    #[Test]
+    public function itListsTheFirstPageOfRegisteredCitizensBeforeSearching(): void
+    {
+        new CitizenSeeder($this->registerCitizen)->run();
+
+        $page = $this->get('/pesquisa')->body;
+
+        self::assertStringContainsString('25 cidadãos cadastrados', $page);
+        self::assertSame(ListCitizens::PER_PAGE, substr_count($page, 'class="person__name"'));
+        self::assertMatchesRegularExpression('/Ana Clara Oliveira.*Ana-Beatriz Rodrigues.*Antônio Ferreira Lima/s', $page);
+        self::assertStringContainsString('Página 1 de 3', $page);
+        self::assertStringContainsString('href="/pesquisa?pagina=2" rel="next"', $page);
+        self::assertStringNotContainsString('rel="prev"', $page);
+        self::assertStringNotContainsString('Ver todos os cidadãos', $page);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function searchTerms(): iterable
+    {
+        yield 'with results' => ['silva'];
+        yield 'without results' => ['Pedro'];
+        yield 'empty' => [' '];
+    }
+
+    #[Test]
+    #[DataProvider('searchTerms')]
+    public function itLinksBackToTheFullListAfterASearch(string $term): void
+    {
+        new CitizenSeeder($this->registerCitizen)->run();
+
+        self::assertStringContainsString(
+            '<a class="link" href="/pesquisa">Ver todos os cidadãos</a>',
+            $this->search($term)->body,
+        );
+    }
+
+    #[Test]
+    public function itNavigatesToTheLastPage(): void
+    {
+        new CitizenSeeder($this->registerCitizen)->run();
+
+        $page = $this->listPage('3')->body;
+
+        self::assertSame(5, substr_count($page, 'class="person__name"'));
+        self::assertStringContainsString('Página 3 de 3', $page);
+        self::assertStringContainsString('href="/pesquisa?pagina=2" rel="prev"', $page);
+        self::assertStringNotContainsString('rel="next"', $page);
+    }
+
+    #[Test]
+    public function itFallsBackToTheFirstPageForAnInvalidPageNumber(): void
+    {
+        new CitizenSeeder($this->registerCitizen)->run();
+
+        self::assertStringContainsString('Página 1 de 3', $this->listPage('abc')->body);
+    }
+
+    #[Test]
+    public function itHidesThePaginationWhenEveryCitizenFitsInOnePage(): void
+    {
+        $this->register('Maria Silva', '52998224725', 'SP');
+
+        $page = $this->get('/pesquisa')->body;
+
+        self::assertStringContainsString('1 cidadão cadastrado', $page);
+        self::assertStringNotContainsString('aria-label="Paginação"', $page);
     }
 
     #[Test]
@@ -167,10 +244,13 @@ final class KernelTest extends TestCase
     }
 
     #[Test]
-    public function itShowsTheEmptySearchErrorOnTheSearchField(): void
+    public function itShowsTheEmptySearchErrorOnTheSearchFieldWithoutListingCitizens(): void
     {
+        $this->register('Maria Silva', '52998224725', 'SP');
+
         $page = $this->search('   ')->body;
 
+        self::assertStringNotContainsString('<table', $page);
         self::assertStringContainsString('field search__field field--error', $page);
         self::assertStringContainsString(
             '<span class="field__message" id="term-message" role="alert">Informe um nome ou CPF para pesquisar.</span>',
@@ -220,6 +300,11 @@ final class KernelTest extends TestCase
     private function search(string $term): Response
     {
         return $this->kernel->handle(new Request('GET', '/pesquisa', query: ['termo' => $term]));
+    }
+
+    private function listPage(string $page): Response
+    {
+        return $this->kernel->handle(new Request('GET', '/pesquisa', query: ['pagina' => $page]));
     }
 
     private function register(string $name, string $cpf, string $state): Response

@@ -95,6 +95,18 @@ final class PdoCitizenRepositoryTest extends TestCase
     }
 
     #[Test]
+    public function itCountsAndListsCitizensPageByPageOrderedByName(): void
+    {
+        $this->repository->add($this->citizen('João Souza', '52998224725'));
+        $this->repository->add($this->citizen('Ana Silveira', '11144477735'));
+        $this->repository->add($this->citizen('Maria Silva', '10000000108'));
+
+        self::assertSame(3, $this->repository->count());
+        self::assertSame(['Ana Silveira', 'João Souza'], $this->names($this->repository->list(2, 0)));
+        self::assertSame(['Maria Silva'], $this->names($this->repository->list(2, 2)));
+    }
+
+    #[Test]
     public function itConvertsTheUniqueViolationIntoADomainException(): void
     {
         $this->repository->add($this->citizen('Maria Silva', '52998224725'));

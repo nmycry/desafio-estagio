@@ -382,6 +382,15 @@ button:focus-visible {
     margin-top: 26px;
 }
 
+.search__reset {
+    margin: -12px 0 0;
+    padding: 0 28px 16px;
+}
+
+.search__reset .link {
+    font-size: 14px;
+}
+
 .input-icon {
     position: relative;
 }
@@ -487,6 +496,28 @@ button:focus-visible {
     border-radius: 999px;
 }
 
+/* Pagination */
+
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px 28px;
+    border-top: 1px solid var(--color-divider);
+}
+
+.button--small {
+    height: 36px;
+    padding: 0 14px;
+    font-size: 14px;
+}
+
+.pagination__status {
+    font-size: 14px;
+    color: var(--color-muted);
+}
+
 /* Empty state */
 
 .empty-state {
@@ -533,7 +564,9 @@ button:focus-visible {
     .card__header,
     .card__body,
     .search,
+    .search__reset,
     .results__summary,
+    .pagination,
     .table th,
     .table td {
         padding-right: 20px;

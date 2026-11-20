@@ -33,16 +33,34 @@ final class InMemoryCitizenRepository implements CitizenRepository
 
     public function searchByName(string $term): array
     {
-        $matches = array_filter(
+        return $this->sortedByName(array_filter(
             $this->citizens,
             static fn(Citizen $citizen): bool => mb_stripos($citizen->name->value(), $term) !== false,
-        );
+        ));
+    }
 
+    public function count(): int
+    {
+        return count($this->citizens);
+    }
+
+    public function list(int $limit, int $offset): array
+    {
+        return array_slice($this->sortedByName($this->citizens), $offset, $limit);
+    }
+
+    /**
+     * @param array<Citizen> $citizens
+     *
+     * @return list<Citizen>
+     */
+    private function sortedByName(array $citizens): array
+    {
         usort(
-            $matches,
-            static fn(Citizen $a, Citizen $b): int => strcmp($a->name->value(), $b->name->value()),
+            $citizens,
+            static fn(Citizen $a, Citizen $b): int => [$a->name->value(), $a->id] <=> [$b->name->value(), $b->id],
         );
 
-        return $matches;
+        return $citizens;
     }
 }

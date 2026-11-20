@@ -75,6 +75,27 @@ final readonly class PdoCitizenRepository implements CitizenRepository
         return array_map($this->hydrate(...), $rows);
     }
 
+    public function count(): int
+    {
+        $statement = $this->pdo->prepare('SELECT COUNT(*) FROM citizens');
+        $statement->execute();
+
+        return (int) $statement->fetchColumn();
+    }
+
+    public function list(int $limit, int $offset): array
+    {
+        $statement = $this->pdo->prepare(self::SELECT_CITIZENS . ' ORDER BY name, id LIMIT :limit OFFSET :offset');
+        $statement->bindValue('limit', $limit, PDO::PARAM_INT);
+        $statement->bindValue('offset', $offset, PDO::PARAM_INT);
+        $statement->execute();
+
+        /** @var list<CitizenRow> $rows */
+        $rows = $statement->fetchAll();
+
+        return array_map($this->hydrate(...), $rows);
+    }
+
     /**
      * Makes the wildcards (% and _) and the escape character itself match
      * literally inside a LIKE pattern declared with ESCAPE '!'.

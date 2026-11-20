@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Infrastructure;
 
+use App\Application\UseCase\ListCitizens\ListCitizens;
 use App\Application\UseCase\RegisterCitizen\RegisterCitizen;
 use App\Application\UseCase\SearchCitizens\SearchCitizens;
+use App\Domain\Citizen\CitizenRepository;
 use App\Infrastructure\Config\Config;
 use App\Infrastructure\Http\Session;
+use App\Infrastructure\Persistence\CitizenSeeder;
 use App\Infrastructure\Persistence\Connection;
 use App\Infrastructure\Persistence\PdoCitizenRepository;
 use App\Infrastructure\View\ViewRenderer;
@@ -29,16 +32,28 @@ final readonly class Container
         return new Kernel(fn(): CitizenController => $this->citizenController($view), $view);
     }
 
+    public function citizenSeeder(): CitizenSeeder
+    {
+        return new CitizenSeeder(new RegisterCitizen($this->citizens()));
+    }
+
     private function citizenController(ViewRenderer $view): CitizenController
     {
-        $config = Config::fromEnvironment();
-        $citizens = new PdoCitizenRepository(Connection::create($config, $config->dbName));
+        $citizens = $this->citizens();
 
         return new CitizenController(
             new RegisterCitizen($citizens),
             new SearchCitizens($citizens),
+            new ListCitizens($citizens),
             $view,
             Session::start(),
         );
+    }
+
+    private function citizens(): CitizenRepository
+    {
+        $config = Config::fromEnvironment();
+
+        return new PdoCitizenRepository(Connection::create($config, $config->dbName));
     }
 }

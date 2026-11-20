@@ -24,6 +24,17 @@ docker compose exec app composer install
 
 Acesse <http://localhost:8080>.
 
+Opcionalmente, popule o banco com 25 cidadãos de exemplo, para ver a lista e
+testar a busca sem cadastrar ninguém à mão:
+
+```bash
+docker compose exec app composer seed
+```
+
+O seeder cadastra pelo mesmo caso de uso do formulário, então os dados passam
+pelas mesmas validações. Ele também pode ser rodado mais de uma vez: os CPFs
+que já existem são pulados.
+
 Na primeira subida o MySQL leva alguns segundos para inicializar. O container
 `app` só sobe depois que o healthcheck do banco passa.
 
@@ -70,6 +81,7 @@ docker compose exec app composer test:integration  # integração (banco citizen
 docker compose exec app composer analyse           # PHPStan, nível max
 docker compose exec app composer cs:check          # PHP-CS-Fixer (PER-CS), sem alterar arquivos
 docker compose exec app composer cs:fix            # aplica as correções de estilo
+docker compose exec app composer seed              # cadastra 25 cidadãos de exemplo
 ```
 
 - **Unitários:** cobrem os value objects, os casos de uso e a camada HTTP.
@@ -106,11 +118,13 @@ docker compose exec app composer cs:fix            # aplica as correções de es
 src/
   Domain/          regras de negócio puras: Citizen, CitizenRepository (interface),
                    value objects Cpf, FullName e BrazilianState, exceções de domínio
-  Application/     casos de uso: RegisterCitizen (+ DTO de entrada) e SearchCitizens
-  Infrastructure/  detalhes técnicos: PDO/MySQL, repositório em memória,
+  Application/     casos de uso: RegisterCitizen (+ DTO de entrada), SearchCitizens
+                   e ListCitizens (+ CitizenPage)
+  Infrastructure/  detalhes técnicos: PDO/MySQL, repositório em memória, seeder,
                    HTTP (Request, Response, Router, Session), views, config, container
   Presentation/    Kernel (rotas + tratamento de erros) e CitizenController,
                    que traduz HTTP <-> casos de uso
+bin/               seed.php (script do `composer seed`)
 public/            front controller (index.php), .htaccess e assets
 templates/         views em PHP puro (layout, páginas e partials)
 database/init/     schema criado na inicialização do MySQL
@@ -175,6 +189,12 @@ requisição, estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
   server-side com visual de abas, e não uma troca de painel em JavaScript.
   Assim a navegação, o PRG e a busca funcionam mesmo sem JS.
 - **Busca:**
+  - Ao abrir a página de pesquisa sem buscar nada, ela lista todos os
+    cidadãos cadastrados, ordenados por nome, em páginas de 10
+    (`/pesquisa?pagina=2`). Uma página fora do intervalo cai na primeira ou na
+    última.
+  - Um termo **enviado** vazio continua mostrando a mensagem de validação,
+    sem consultar o banco nem listar ninguém.
   - Um termo com 11 dígitos (com ou sem máscara) é tratado como CPF; qualquer
     outro, como parte do nome.
   - A collation `utf8mb4_unicode_ci` torna a busca por nome insensível a
@@ -191,7 +211,8 @@ requisição, estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
 ## Possíveis melhorias
 
-- Paginação na busca por nome, para bases grandes.
+- Paginação também nos resultados da busca por nome (hoje só a listagem
+  inicial é paginada).
 - Edição e exclusão de cadastros.
 - Busca por nome com índice FULLTEXT, ou por prefixo (`LIKE 'termo%'`), para
   aproveitar índice. O `LIKE '%termo%'` atual não usa o índice em `name`.

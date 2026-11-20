@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Presentation\Controller;
 
+use App\Application\UseCase\ListCitizens\ListCitizens;
 use App\Application\UseCase\RegisterCitizen\RegisterCitizen;
 use App\Application\UseCase\RegisterCitizen\RegisterCitizenInput;
 use App\Application\UseCase\SearchCitizens\EmptySearchTermException;
@@ -26,6 +27,7 @@ final readonly class CitizenController
     public function __construct(
         private RegisterCitizen $registerCitizen,
         private SearchCitizens $searchCitizens,
+        private ListCitizens $listCitizens,
         private ViewRenderer $view,
         private Session $session,
     ) {}
@@ -67,13 +69,20 @@ final readonly class CitizenController
         return Response::redirect('/');
     }
 
+    /**
+     * Without a term, lists every registered citizen page by page; with one
+     * (even empty, which is a validation error), searches.
+     */
     public function search(Request $request): Response
     {
         $term = $request->query('termo');
+        $listing = null;
         $citizens = null;
         $error = null;
 
-        if ($term !== null) {
+        if ($term === null) {
+            $listing = $this->listCitizens->handle((int) ($request->query('pagina') ?? 1));
+        } else {
             try {
                 $citizens = $this->searchCitizens->handle($term);
             } catch (EmptySearchTermException $exception) {
@@ -85,6 +94,7 @@ final readonly class CitizenController
             'title' => 'Pesquisar cidadão',
             'activeTab' => 'search',
             'term' => $term ?? '',
+            'listing' => $listing,
             'citizens' => $citizens,
             'error' => $error,
         ]));

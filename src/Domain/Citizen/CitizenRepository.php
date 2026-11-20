@@ -25,4 +25,11 @@ interface CitizenRepository
      * @return list<Citizen> ordered by name
      */
     public function searchByName(string $term): array;
+
+    public function count(): int;
+
+    /**
+     * @return list<Citizen> ordered by name
+     */
+    public function list(int $limit, int $offset): array;
 }
