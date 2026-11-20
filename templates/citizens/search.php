@@ -5,8 +5,7 @@ declare(strict_types=1);
 /**
  * @var App\Infrastructure\View\ViewRenderer $this
  * @var string $term
- * @var App\Application\UseCase\ListCitizens\CitizenPage|null $listing set when no search was made
- * @var list<App\Domain\Citizen\Citizen>|null $citizens set when a search was made
+ * @var list<App\Domain\Citizen\Citizen>|null $citizens null when no search was made
  * @var string|null $error
  */
 ?>
@@ -23,7 +22,7 @@ declare(strict_types=1);
                 <div class="input-icon">
                     <?= $this->partial('partials/icon', ['name' => 'search']) ?>
                     <input id="term" name="termo" type="search" value="<?= e($term) ?>"
-                           placeholder="Ex.: Maria ou 000.000.000-00" data-search-input
+                           placeholder="Ex.: Maria ou 000.000.000-00" data-cpf-search
                            <?= $error !== null ? 'aria-invalid="true" aria-describedby="term-message"' : '' ?>>
                 </div>
                 <?php if ($error !== null): ?>
@@ -33,40 +32,52 @@ declare(strict_types=1);
             <button class="button button--primary" type="submit">Pesquisar</button>
         </form>
 
-        <?php if ($listing === null): ?>
-            <p class="search__reset"><a class="link" href="/pesquisa">Ver todos os cidadãos</a></p>
-        <?php endif ?>
-
-        <?php if ($listing !== null): ?>
+        <?php if ($citizens === []): ?>
             <div class="results">
-                <?php if ($listing->total === 0): ?>
-                    <?= $this->partial('partials/empty-state', [
-                        'title' => 'Nenhum cidadão cadastrado ainda',
-                        'message' => 'Os cidadãos cadastrados aparecerão aqui.',
-                    ]) ?>
-                <?php else: ?>
-                    <p class="results__summary">
-                        <?= $listing->total === 1 ? '1 cidadão cadastrado' : $listing->total . ' cidadãos cadastrados' ?>
-                    </p>
-                    <?= $this->partial('partials/citizens-table', ['citizens' => $listing->citizens]) ?>
-                    <?php if ($listing->totalPages > 1): ?>
-                        <?= $this->partial('partials/pagination', ['listing' => $listing]) ?>
-                    <?php endif ?>
-                <?php endif ?>
-            </div>
-        <?php elseif ($citizens === []): ?>
-            <div class="results">
-                <?= $this->partial('partials/empty-state', [
-                    'title' => 'Cidadão não encontrado',
-                    'message' => 'Confira a grafia ou tente buscar só pelo primeiro nome ou pelos números do CPF.',
-                ]) ?>
+                <div class="empty-state">
+                    <div class="empty-state__icon"><?= $this->partial('partials/icon', ['name' => 'search-empty', 'size' => 22]) ?></div>
+                    <strong role="alert">Cidadão não encontrado</strong>
+                    <span>Confira a grafia ou tente buscar só pelo primeiro nome ou pelos números do CPF.</span>
+                    <a class="link" href="/">Cadastrar novo cidadão</a>
+                </div>
             </div>
         <?php elseif ($citizens !== null): ?>
             <div class="results">
                 <p class="results__summary" role="status">
                     <?= count($citizens) === 1 ? '1 cidadão encontrado' : count($citizens) . ' cidadãos encontrados' ?>
                 </p>
-                <?= $this->partial('partials/citizens-table', ['citizens' => $citizens]) ?>
+
+                <div class="table-wrapper">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Nome</th>
+                                <th scope="col">CPF</th>
+                                <th scope="col">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($citizens as $citizen): ?>
+                                <tr>
+                                    <td>
+                                        <div class="person">
+                                            <span class="avatar" aria-hidden="true"><?= e(initials($citizen->name->value())) ?></span>
+                                            <span class="person__name"><?= e($citizen->name->value()) ?></span>
+                                        </div>
+                                    </td>
+                                    <td class="table__cpf"><?= e($citizen->cpf->formatted()) ?></td>
+                                    <td>
+                                        <?php if ($citizen->state === null): ?>
+                                            <span class="table__empty">Não informado</span>
+                                        <?php else: ?>
+                                            <span class="state-tag"><?= e($citizen->state->value) ?></span>
+                                        <?php endif ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         <?php endif ?>
     </div>

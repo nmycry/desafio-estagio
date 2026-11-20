@@ -52,10 +52,6 @@ Os casos de uso: o que o sistema faz, orquestrando o domínio. Cada caso de uso
   - Rejeita termo vazio.
   - Se o termo tem 11 dígitos (com ou sem máscara), busca por CPF.
   - Caso contrário, busca por nome (parcial e sem diferenciar maiúsculas).
-- **`ListCitizens`:** devolve uma `CitizenPage` (os cidadãos da página, o
-  número dela, o total de páginas e o total de cadastros), com 10 por página
-  e ordem por nome. Uma página fora do intervalo vira a primeira ou a última.
-  É o que a página de pesquisa mostra antes de o usuário buscar algo.
 
 Esta camada conhece só o domínio. Ela recebe o repositório pelo construtor,
 como interface, e não sabe se do outro lado há MySQL ou um array em memória.
@@ -67,7 +63,7 @@ entrada HTTP.
 
 | Pasta | Conteúdo |
 |---|---|
-| `Persistence` | **Adaptadores** do repositório: `PdoCitizenRepository` (MySQL, só prepared statements) e `InMemoryCitizenRepository` (testes). `Connection` cria o PDO. `CitizenSeeder` cadastra 25 cidadãos de exemplo (`composer seed`). |
+| `Persistence` | **Adaptadores** do repositório: `PdoCitizenRepository` (MySQL, só prepared statements) e `InMemoryCitizenRepository` (testes). `Connection` cria o PDO. |
 | `Http` | `Request`, `Response`, `Router`, `Session` (flash e CSRF) e `HttpException`: um mini-framework próprio, já que o desafio proíbe frameworks. |
 | `View` | `ViewRenderer` (templates em PHP puro) e os helpers `e()` (escape) e `initials()` (iniciais do avatar). |
 | `Config` | Leitura das variáveis de ambiente. |
@@ -116,7 +112,7 @@ sequenceDiagram
     UC->>Repo: add(citizen)
     Repo->>DB: INSERT ...
     UC-->>C: Citizen (com id)
-    C->>C: grava flash (nome, CPF formatado, UF)
+    C->>C: grava flash (nome, CPF formatado e UF, se informada)
     C-->>B: 303 See Other → /
     B->>FC: GET /
     FC-->>B: formulário + mensagem de sucesso (flash consumido)
@@ -136,14 +132,15 @@ atributo `data-selected` que o servidor devolve.
 
 A integração é **só de experiência de uso**:
 
-- **O domínio não depende dela.** A UF enviada é validada pelo enum
+- **O estado é opcional.** O enunciado exige apenas nome e CPF, então o estado
+  é um dado extra. O caso de uso trata o campo vazio como "não informado"
+  (`null`), e a busca mostra "Não informado" nesse caso.
+- **O domínio não depende da API.** A UF enviada é validada pelo enum
   `BrazilianState`, então uma requisição forjada com `XX` vira erro 422, com ou
   sem IBGE.
-- **Falhas são tratadas.** Se a API cair ou responder com erro, o campo mostra
-  "Não foi possível carregar os estados. Recarregue a página.".
-- **Custo assumido:** sem JS ou sem a API, não há como escolher o estado.
-  Renderizar a lista pelo servidor, a partir do enum, como alternativa está em
-  "Possíveis melhorias" no README.
+- **Uma falha não bloqueia o cadastro.** Se a API cair ou responder com erro,
+  o campo avisa que não foi possível carregar os estados e que é possível
+  cadastrar sem ele.
 
 ## Tratamento de erros
 
@@ -189,20 +186,6 @@ A separação em camadas define a estratégia:
   contra um banco MySQL real e separado (`citizens_test`). Cobrem o que só o
   banco valida: collation (busca sem diferenciar maiúsculas e acentos),
   escape do `LIKE` e conversão do erro de duplicidade.
-
-## Seeder
-
-`composer seed` executa `bin/seed.php`, que pede ao `Container` um
-`CitizenSeeder` e o roda. O seeder **não grava direto no banco**: cada um dos
-25 cidadãos passa pelo caso de uso `RegisterCitizen`, exatamente como um envio
-do formulário. Por isso:
-
-- Os dados de exemplo nunca furam as regras do domínio. Se um CPF ou nome
-  fosse inválido, o seeder falharia em vez de gravar lixo.
-- Ele é idempotente: um CPF que já existe gera `CitizenAlreadyExistsException`,
-  que o seeder conta como "já existia" e segue em frente.
-- Os testes reaproveitam o mesmo seeder com o repositório em memória para
-  popular a listagem paginada.
 
 ## Simplificações conscientes
 

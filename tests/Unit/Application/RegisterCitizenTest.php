@@ -67,10 +67,18 @@ final class RegisterCitizenTest extends TestCase
     }
 
     #[Test]
-    public function itRejectsAnInvalidState(): void
+    public function itRegistersACitizenWithoutState(): void
+    {
+        $citizen = $this->registerCitizen->handle(new RegisterCitizenInput('Maria Silva', '52998224725', '  '));
+
+        self::assertNull($citizen->state);
+    }
+
+    #[Test]
+    public function itRejectsAnUnknownState(): void
     {
         $this->expectException(InvalidStateException::class);
 
-        $this->registerCitizen->handle(new RegisterCitizenInput('Maria Silva', '52998224725', ''));
+        $this->registerCitizen->handle(new RegisterCitizenInput('Maria Silva', '52998224725', 'XX'));
     }
 }

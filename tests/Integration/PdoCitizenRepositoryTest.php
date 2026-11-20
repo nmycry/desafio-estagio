@@ -95,15 +95,14 @@ final class PdoCitizenRepositoryTest extends TestCase
     }
 
     #[Test]
-    public function itCountsAndListsCitizensPageByPageOrderedByName(): void
+    public function itStoresACitizenWithoutState(): void
     {
-        $this->repository->add($this->citizen('João Souza', '52998224725'));
-        $this->repository->add($this->citizen('Ana Silveira', '11144477735'));
-        $this->repository->add($this->citizen('Maria Silva', '10000000108'));
+        $this->repository->add($this->citizen('Maria Silva', '52998224725', null));
 
-        self::assertSame(3, $this->repository->count());
-        self::assertSame(['Ana Silveira', 'João Souza'], $this->names($this->repository->list(2, 0)));
-        self::assertSame(['Maria Silva'], $this->names($this->repository->list(2, 2)));
+        $found = $this->repository->findByCpf(Cpf::fromString('52998224725'));
+
+        self::assertNotNull($found);
+        self::assertNull($found->state);
     }
 
     #[Test]
@@ -116,7 +115,7 @@ final class PdoCitizenRepositoryTest extends TestCase
         $this->repository->add($this->citizen('João Souza', '52998224725'));
     }
 
-    private function citizen(string $name, string $cpf, BrazilianState $state = BrazilianState::SP): Citizen
+    private function citizen(string $name, string $cpf, ?BrazilianState $state = BrazilianState::SP): Citizen
     {
         return Citizen::register(
             FullName::fromString($name),

@@ -29,7 +29,7 @@ final readonly class RegisterCitizen
     {
         $name = FullName::fromString($input->name);
         $cpf = Cpf::fromString($input->cpf);
-        $state = BrazilianState::fromCode($input->state);
+        $state = trim($input->state) === '' ? null : BrazilianState::fromCode($input->state);
 
         if ($this->citizens->findByCpf($cpf) !== null) {
             throw CitizenAlreadyExistsException::withCpf($cpf);

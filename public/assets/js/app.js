@@ -76,15 +76,10 @@ function setupCpfInput(input) {
 }
 
 // The search field accepts names or CPFs: the mask applies only while the
-// user types nothing but digits and CPF punctuation. Clearing the field after
-// a search goes back to the full list (submitting it empty is a validation error).
-function setupSearchInput(input) {
-    const searched = new URLSearchParams(window.location.search).has(input.name);
-
+// user types nothing but digits and CPF punctuation.
+function setupCpfSearch(input) {
     input.addEventListener('input', () => {
-        if (input.value === '' && searched) {
-            window.location.assign(input.form.action);
-        } else if (/^[\d.\-\s]+$/.test(input.value)) {
+        if (/^[\d.\-\s]+$/.test(input.value)) {
             input.value = maskCpf(input.value);
         }
     });
@@ -108,10 +103,10 @@ async function setupStatesSelect(select) {
 
         select.value = select.dataset.selected;
     } catch {
-        showFieldError(select, 'Não foi possível carregar os estados. Recarregue a página.');
+        showFieldError(select, 'Não foi possível carregar os estados. O campo é opcional: você pode cadastrar sem ele.');
     }
 }
 
 document.querySelectorAll('[data-cpf-input]').forEach(setupCpfInput);
-document.querySelectorAll('[data-search-input]').forEach(setupSearchInput);
+document.querySelectorAll('[data-cpf-search]').forEach(setupCpfSearch);
 document.querySelectorAll('[data-states-select]').forEach(setupStatesSelect);

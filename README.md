@@ -1,7 +1,8 @@
 # Cadastro de Cidadãos
 
 Aplicação em PHP 8.5 puro (sem framework) para cadastrar cidadãos brasileiros
-(nome completo, CPF e estado) e pesquisá-los por nome ou CPF.
+(nome completo e CPF, obrigatórios, e estado, opcional) e pesquisá-los por
+nome ou CPF.
 
 ## Requisitos
 
@@ -10,9 +11,11 @@ Aplicação em PHP 8.5 puro (sem framework) para cadastrar cidadãos brasileiros
 
 PHP, Composer e MySQL **não** precisam estar instalados: rodam dentro dos containers.
 
-O navegador precisa de acesso à internet: a lista de estados do formulário vem
-da [API de Localidades do IBGE](https://servicodados.ibge.gov.br/api/docs/localidades)
-e a fonte Inter, do Google Fonts.
+A lista de estados do formulário vem da
+[API de Localidades do IBGE](https://servicodados.ibge.gov.br/api/docs/localidades)
+e a fonte Inter, do Google Fonts, então o navegador usa a internet para
+carregá-las. Sem acesso a elas, a aplicação continua funcionando: o estado é
+opcional e a fonte cai para a fonte do sistema.
 
 ## Como rodar
 
@@ -23,17 +26,6 @@ docker compose exec app composer install
 ```
 
 Acesse <http://localhost:8080>.
-
-Opcionalmente, popule o banco com 25 cidadãos de exemplo, para ver a lista e
-testar a busca sem cadastrar ninguém à mão:
-
-```bash
-docker compose exec app composer seed
-```
-
-O seeder cadastra pelo mesmo caso de uso do formulário, então os dados passam
-pelas mesmas validações. Ele também pode ser rodado mais de uma vez: os CPFs
-que já existem são pulados.
 
 Na primeira subida o MySQL leva alguns segundos para inicializar. O container
 `app` só sobe depois que o healthcheck do banco passa.
@@ -81,7 +73,6 @@ docker compose exec app composer test:integration  # integração (banco citizen
 docker compose exec app composer analyse           # PHPStan, nível max
 docker compose exec app composer cs:check          # PHP-CS-Fixer (PER-CS), sem alterar arquivos
 docker compose exec app composer cs:fix            # aplica as correções de estilo
-docker compose exec app composer seed              # cadastra 25 cidadãos de exemplo
 ```
 
 - **Unitários:** cobrem os value objects, os casos de uso e a camada HTTP.
@@ -98,8 +89,8 @@ docker compose exec app composer seed              # cadastra 25 cidadãos de ex
   publicada no host: dentro da rede do Docker a aplicação sempre fala com
   `db:3306`.
 - Para resetar o banco (apaga todos os dados e recria o schema na próxima
-  subida). Isso também é necessário quando o schema muda, por exemplo, ao
-  atualizar de uma versão sem a coluna `state`:
+  subida). Isso também é necessário quando o schema muda, já que o script de
+  inicialização só roda num volume novo:
 
   ```bash
   docker compose down -v
@@ -118,13 +109,11 @@ docker compose exec app composer seed              # cadastra 25 cidadãos de ex
 src/
   Domain/          regras de negócio puras: Citizen, CitizenRepository (interface),
                    value objects Cpf, FullName e BrazilianState, exceções de domínio
-  Application/     casos de uso: RegisterCitizen (+ DTO de entrada), SearchCitizens
-                   e ListCitizens (+ CitizenPage)
-  Infrastructure/  detalhes técnicos: PDO/MySQL, repositório em memória, seeder,
+  Application/     casos de uso: RegisterCitizen (+ DTO de entrada) e SearchCitizens
+  Infrastructure/  detalhes técnicos: PDO/MySQL, repositório em memória,
                    HTTP (Request, Response, Router, Session), views, config, container
   Presentation/    Kernel (rotas + tratamento de erros) e CitizenController,
                    que traduz HTTP <-> casos de uso
-bin/               seed.php (script do `composer seed`)
 public/            front controller (index.php), .htaccess e assets
 templates/         views em PHP puro (layout, páginas e partials)
 database/init/     schema criado na inicialização do MySQL
@@ -145,12 +134,13 @@ requisição, estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
   (`000.000.000-00`) apenas na exibição. O estado é o enum `BrazilianState`,
   com as 27 UFs: um conjunto fechado e conhecido de valores é exatamente o caso
   de uso de um enum.
-- **Lista de estados via IBGE:** o `<select>` de estados é preenchido no
+- **Estado opcional, com lista via IBGE:** o enunciado exige só nome e CPF,
+  então o estado é um dado extra e opcional. O `<select>` é preenchido no
   navegador pela API de Localidades do IBGE, que é pública, gratuita, dispensa
   chave e libera CORS. A API só melhora a experiência: o servidor valida a UF
   enviada contra o enum, então um valor fora da lista nunca é gravado. Se a
-  API estiver fora do ar, o campo mostra um aviso pedindo para recarregar a
-  página.
+  API estiver fora do ar, o campo mostra um aviso, e o cadastro continua
+  funcionando sem o estado.
 - **Repository:** `CitizenRepository` é uma interface do domínio com duas
   implementações. `PdoCitizenRepository` serve a aplicação e os testes de
   integração. `InMemoryCitizenRepository` permite testar os casos de uso sem
@@ -170,8 +160,8 @@ requisição, estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
   `Kernel`, onde ficam o roteamento e o tratamento centralizado de erros. Como
   o `Kernel` é uma classe comum, os testes o exercitam sem servidor HTTP.
 - **Post/Redirect/Get:** depois de um cadastro bem-sucedido, a resposta é um
-  `303` para `/`. A mensagem de sucesso, com nome, CPF formatado e UF, viaja
-  numa flash message na sessão. Recarregar a página não reenvia o formulário.
+  `303` para `/`. A mensagem de sucesso, com nome, CPF formatado e UF (quando
+  informada), viaja numa flash message na sessão. Recarregar a página não reenvia o formulário.
 - **Tratamento de erros:** exceções de domínio (CPF inválido, nome inválido,
   estado inválido, duplicidade, busca vazia) viram mensagens amigáveis exibidas
   abaixo do campo que causou o erro.
@@ -189,12 +179,11 @@ requisição, estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
   server-side com visual de abas, e não uma troca de painel em JavaScript.
   Assim a navegação, o PRG e a busca funcionam mesmo sem JS.
 - **Busca:**
-  - Ao abrir a página de pesquisa sem buscar nada, ela lista todos os
-    cidadãos cadastrados, ordenados por nome, em páginas de 10
-    (`/pesquisa?pagina=2`). Uma página fora do intervalo cai na primeira ou na
-    última.
-  - Um termo **enviado** vazio continua mostrando a mensagem de validação,
-    sem consultar o banco nem listar ninguém.
+  - A página de pesquisa mostra só o formulário até o usuário buscar. Ela não
+    lista todos os cadastrados: o enunciado descreve apenas a busca, e expor
+    nome e CPF de todo mundo numa página sem login não seria uma boa prática
+    (CPF é dado pessoal, protegido pela LGPD).
+  - Um termo vazio mostra uma mensagem de validação, sem consultar o banco.
   - Um termo com 11 dígitos (com ou sem máscara) é tratado como CPF; qualquer
     outro, como parte do nome.
   - A collation `utf8mb4_unicode_ci` torna a busca por nome insensível a
@@ -211,8 +200,7 @@ requisição, estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
 ## Possíveis melhorias
 
-- Paginação também nos resultados da busca por nome (hoje só a listagem
-  inicial é paginada).
+- Paginação na busca por nome, para bases grandes.
 - Edição e exclusão de cadastros.
 - Busca por nome com índice FULLTEXT, ou por prefixo (`LIKE 'termo%'`), para
   aproveitar índice. O `LIKE '%termo%'` atual não usa o índice em `name`.

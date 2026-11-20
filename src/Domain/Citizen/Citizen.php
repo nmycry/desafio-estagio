@@ -15,14 +15,14 @@ final readonly class Citizen
         public ?int $id,
         public FullName $name,
         public Cpf $cpf,
-        public BrazilianState $state,
+        public ?BrazilianState $state,
         public DateTimeImmutable $createdAt,
     ) {}
 
     public static function register(
         FullName $name,
         Cpf $cpf,
-        BrazilianState $state,
+        ?BrazilianState $state,
         DateTimeImmutable $createdAt,
     ): self {
         return new self(null, $name, $cpf, $state, $createdAt);

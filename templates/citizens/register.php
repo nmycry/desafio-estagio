@@ -17,7 +17,11 @@ $invalid = static fn(string $field): string => isset($errors[$field]) ? ' aria-i
     <?php if ($registered !== null): ?>
         <?= $this->partial('partials/success-alert', [
             'title' => 'Cidadão cadastrado com sucesso',
-            'message' => sprintf('%s · CPF %s · %s', $registered['name'], $registered['cpf'], $registered['state']),
+            'message' => implode(' · ', array_filter([
+                $registered['name'],
+                'CPF ' . $registered['cpf'],
+                $registered['state'],
+            ])),
         ]) ?>
     <?php endif ?>
 
@@ -56,14 +60,14 @@ $invalid = static fn(string $field): string => isset($errors[$field]) ? ' aria-i
                 </div>
 
                 <div class="<?= $fieldClass('state') ?>">
-                    <label for="state">Estado <span class="required">*</span></label>
-                    <select id="state" name="state" required aria-describedby="state-message"
+                    <label for="state">Estado</label>
+                    <select id="state" name="state" aria-describedby="state-message"
                             data-states-select data-selected="<?= e($old->state) ?>"<?= $invalid('state') ?>>
                         <option value="">Selecione o estado</option>
                     </select>
                     <?= $this->partial('partials/field-message', [
                         'id' => 'state-message',
-                        'help' => 'Estado onde o cidadão reside.',
+                        'help' => 'Opcional. Estado onde o cidadão reside.',
                         'error' => $errors['state'] ?? null,
                     ]) ?>
                 </div>
