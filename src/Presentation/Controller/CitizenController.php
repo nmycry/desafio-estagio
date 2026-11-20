@@ -8,7 +8,11 @@ use App\Application\UseCase\RegisterCitizen\RegisterCitizen;
 use App\Application\UseCase\RegisterCitizen\RegisterCitizenInput;
 use App\Application\UseCase\SearchCitizens\EmptySearchTermException;
 use App\Application\UseCase\SearchCitizens\SearchCitizens;
+use App\Domain\Exception\CitizenAlreadyExistsException;
 use App\Domain\Exception\DomainException;
+use App\Domain\Exception\InvalidCpfException;
+use App\Domain\Exception\InvalidNameException;
+use App\Domain\Exception\InvalidStateException;
 use App\Infrastructure\Http\HttpException;
 use App\Infrastructure\Http\Request;
 use App\Infrastructure\Http\Response;
@@ -39,18 +43,25 @@ final readonly class CitizenController
             throw HttpException::badRequest('Sua sessão expirou. Recarregue a página e tente novamente.');
         }
 
-        $input = new RegisterCitizenInput($request->input('name'), $request->input('cpf'));
+        $input = new RegisterCitizenInput(
+            $request->input('name'),
+            $request->input('cpf'),
+            $request->input('state'),
+        );
 
         try {
             $citizen = $this->registerCitizen->handle($input);
         } catch (DomainException $exception) {
-            return $this->renderRegisterForm(['error' => $exception->getMessage(), 'old' => $input], 422);
+            return $this->renderRegisterForm([
+                'errors' => [$this->fieldOf($exception) => $exception->getMessage()],
+                'old' => $input,
+            ], 422);
         }
 
         $this->session->flash(self::REGISTERED_FLASH, [
-            'message' => 'Cidadão cadastrado com sucesso!',
             'name' => $citizen->name->value(),
             'cpf' => $citizen->cpf->formatted(),
+            'state' => $citizen->state->value,
         ]);
 
         return Response::redirect('/');
@@ -89,9 +100,23 @@ final readonly class CitizenController
             'activeTab' => 'register',
             'csrfToken' => $this->session->csrfToken(),
             'registered' => null,
-            'error' => null,
-            'old' => new RegisterCitizenInput('', ''),
+            'errors' => [],
+            'old' => new RegisterCitizenInput('', '', ''),
             ...$data,
         ]), $status);
+    }
+
+    /**
+     * The form field whose input caused the error, so the message is shown next to it.
+     */
+    private function fieldOf(DomainException $exception): string
+    {
+        return match (true) {
+            $exception instanceof InvalidNameException => 'name',
+            $exception instanceof InvalidCpfException,
+            $exception instanceof CitizenAlreadyExistsException => 'cpf',
+            $exception instanceof InvalidStateException => 'state',
+            default => throw $exception,
+        };
     }
 }

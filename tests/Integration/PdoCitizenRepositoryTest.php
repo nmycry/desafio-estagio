@@ -6,6 +6,7 @@ namespace Tests\Integration;
 
 use App\Domain\Citizen\Citizen;
 use App\Domain\Exception\CitizenAlreadyExistsException;
+use App\Domain\Shared\ValueObject\BrazilianState;
 use App\Domain\Shared\ValueObject\Cpf;
 use App\Domain\Shared\ValueObject\FullName;
 use App\Infrastructure\Config\Config;
@@ -34,18 +35,18 @@ final class PdoCitizenRepositoryTest extends TestCase
     #[Test]
     public function itAddsACitizenAndStoresOnlyCpfDigits(): void
     {
-        $citizen = $this->repository->add($this->citizen('Maria Silva', '529.982.247-25'));
+        $citizen = $this->repository->add($this->citizen('Maria Silva', '529.982.247-25', BrazilianState::RJ));
 
-        $statement = $this->pdo->prepare('SELECT cpf FROM citizens WHERE id = :id');
+        $statement = $this->pdo->prepare('SELECT cpf, state FROM citizens WHERE id = :id');
         $statement->execute(['id' => $citizen->id]);
 
-        self::assertSame('52998224725', $statement->fetchColumn());
+        self::assertSame(['cpf' => '52998224725', 'state' => 'RJ'], $statement->fetch());
     }
 
     #[Test]
     public function itFindsACitizenByCpf(): void
     {
-        $added = $this->repository->add($this->citizen('Maria Silva', '52998224725'));
+        $added = $this->repository->add($this->citizen('Maria Silva', '52998224725', BrazilianState::RJ));
 
         $found = $this->repository->findByCpf(Cpf::fromString('52998224725'));
 
@@ -53,6 +54,7 @@ final class PdoCitizenRepositoryTest extends TestCase
         self::assertSame($added->id, $found->id);
         self::assertSame('Maria Silva', $found->name->value());
         self::assertSame('529.982.247-25', $found->cpf->formatted());
+        self::assertSame(BrazilianState::RJ, $found->state);
         self::assertEquals($added->createdAt, $found->createdAt);
     }
 
@@ -102,11 +104,12 @@ final class PdoCitizenRepositoryTest extends TestCase
         $this->repository->add($this->citizen('João Souza', '52998224725'));
     }
 
-    private function citizen(string $name, string $cpf): Citizen
+    private function citizen(string $name, string $cpf, BrazilianState $state = BrazilianState::SP): Citizen
     {
         return Citizen::register(
             FullName::fromString($name),
             Cpf::fromString($cpf),
+            $state,
             new DateTimeImmutable('2026-01-01 10:00:00'),
         );
     }

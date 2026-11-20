@@ -50,24 +50,25 @@ final class KernelTest extends TestCase
         $response = $this->get('/');
 
         self::assertSame(200, $response->status);
-        self::assertStringContainsString('<form class="form" method="post" action="/cidadaos"', $response->body);
+        self::assertStringContainsString('method="post" action="/cidadaos"', $response->body);
         self::assertStringContainsString('value="' . $this->session->csrfToken() . '"', $response->body);
+        self::assertStringContainsString('<select id="state" name="state"', $response->body);
+        self::assertStringNotContainsString('field--error', $response->body);
     }
 
     #[Test]
     public function itRedirectsAfterRegisteringAndShowsTheFlashMessageOnce(): void
     {
-        $response = $this->register('Maria Silva', '52998224725');
+        $response = $this->register('Maria Silva', '52998224725', 'SP');
 
         self::assertSame(303, $response->status);
         self::assertSame('/', $response->headers['Location']);
 
         $page = $this->get('/')->body;
-        self::assertStringContainsString('Cidadão cadastrado com sucesso!', $page);
-        self::assertStringContainsString('Maria Silva', $page);
-        self::assertStringContainsString('529.982.247-25', $page);
+        self::assertStringContainsString('Cidadão cadastrado com sucesso', $page);
+        self::assertStringContainsString('Maria Silva · CPF 529.982.247-25 · SP', $page);
 
-        self::assertStringNotContainsString('Cidadão cadastrado com sucesso!', $this->get('/')->body);
+        self::assertStringNotContainsString('Cidadão cadastrado com sucesso', $this->get('/')->body);
     }
 
     #[Test]
@@ -77,6 +78,7 @@ final class KernelTest extends TestCase
             '_token' => 'forged',
             'name' => 'Maria Silva',
             'cpf' => '52998224725',
+            'state' => 'SP',
         ]));
 
         self::assertSame(400, $response->status);
@@ -85,27 +87,36 @@ final class KernelTest extends TestCase
     }
 
     #[Test]
-    public function itShowsValidationErrorsKeepingTheEscapedInput(): void
+    public function itShowsTheErrorNextToTheFieldKeepingTheEscapedInput(): void
     {
-        $response = $this->register('<script>alert(1)</script>', '123.456.789-00');
+        $response = $this->register('<script>alert(1)</script>', '123.456.789-00', 'RJ');
 
         self::assertSame(422, $response->status);
-        self::assertStringContainsString('role="alert"', $response->body);
-        self::assertStringContainsString('O nome deve conter apenas letras', $response->body);
+        $this->assertFieldError($response->body, 'name', 'O nome deve conter apenas letras, espaços, apóstrofo e hífen.');
         self::assertStringContainsString('value="&lt;script&gt;alert(1)&lt;/script&gt;"', $response->body);
         self::assertStringContainsString('value="123.456.789-00"', $response->body);
+        self::assertStringContainsString('data-selected="RJ"', $response->body);
         self::assertStringNotContainsString('<script>alert(1)</script>', $response->body);
     }
 
     #[Test]
-    public function itShowsAFriendlyErrorForADuplicatedCpf(): void
+    public function itShowsTheErrorOnTheStateFieldWhenNoStateIsChosen(): void
     {
-        $this->register('Maria Silva', '52998224725');
-
-        $response = $this->register('João Souza', '529.982.247-25');
+        $response = $this->register('Maria Silva', '52998224725', '');
 
         self::assertSame(422, $response->status);
-        self::assertStringContainsString('Já existe um cidadão cadastrado com o CPF 529.982.247-25.', $response->body);
+        $this->assertFieldError($response->body, 'state', 'Selecione um estado válido.');
+    }
+
+    #[Test]
+    public function itShowsAFriendlyErrorOnTheCpfFieldForADuplicatedCpf(): void
+    {
+        $this->register('Maria Silva', '52998224725', 'SP');
+
+        $response = $this->register('João Souza', '529.982.247-25', 'RJ');
+
+        self::assertSame(422, $response->status);
+        $this->assertFieldError($response->body, 'cpf', 'Já existe um cidadão cadastrado com o CPF 529.982.247-25.');
     }
 
     #[Test]
@@ -114,26 +125,31 @@ final class KernelTest extends TestCase
         $response = $this->get('/pesquisa');
 
         self::assertSame(200, $response->status);
-        self::assertStringContainsString('<form class="form form--inline" method="get" action="/pesquisa"', $response->body);
+        self::assertStringContainsString('method="get" action="/pesquisa"', $response->body);
+        self::assertStringNotContainsString('<table', $response->body);
         self::assertStringNotContainsString('role="alert"', $response->body);
     }
 
     #[Test]
-    public function itListsEveryCitizenFoundByNameOrderedByName(): void
+    public function itListsEveryCitizenFoundByNameOrderedByNameWithTheirState(): void
     {
-        $this->register('Maria Silva', '52998224725');
-        $this->register('Ana Silveira', '11144477735');
+        $this->register('Maria Silva', '52998224725', 'SP');
+        $this->register('Ana Silveira', '11144477735', 'MG');
 
         $page = $this->search('silv')->body;
 
         self::assertStringContainsString('2 cidadãos encontrados', $page);
-        self::assertMatchesRegularExpression('/Ana Silveira.*111\.444\.777-35.*Maria Silva.*529\.982\.247-25/s', $page);
+        self::assertStringContainsString('<th scope="col">Estado</th>', $page);
+        self::assertMatchesRegularExpression(
+            '/AS.*Ana Silveira.*111\.444\.777-35.*MG.*MS.*Maria Silva.*529\.982\.247-25.*SP/s',
+            $page,
+        );
     }
 
     #[Test]
     public function itFindsACitizenByCpf(): void
     {
-        $this->register('Maria Silva', '52998224725');
+        $this->register('Maria Silva', '52998224725', 'SP');
 
         $page = $this->search('529.982.247-25')->body;
 
@@ -144,16 +160,22 @@ final class KernelTest extends TestCase
     #[Test]
     public function itShowsTheNotFoundMessage(): void
     {
-        self::assertStringContainsString(
-            '<p class="alert__message">Cidadão não encontrado</p>',
-            $this->search('Pedro')->body,
-        );
+        $page = $this->search('Pedro')->body;
+
+        self::assertStringContainsString('<strong role="alert">Cidadão não encontrado</strong>', $page);
+        self::assertStringNotContainsString('<table', $page);
     }
 
     #[Test]
-    public function itShowsAValidationMessageForAnEmptySearch(): void
+    public function itShowsTheEmptySearchErrorOnTheSearchField(): void
     {
-        self::assertStringContainsString('Informe um nome ou CPF para pesquisar.', $this->search('   ')->body);
+        $page = $this->search('   ')->body;
+
+        self::assertStringContainsString('field search__field field--error', $page);
+        self::assertStringContainsString(
+            '<span class="field__message" id="term-message" role="alert">Informe um nome ou CPF para pesquisar.</span>',
+            $page,
+        );
     }
 
     #[Test]
@@ -200,12 +222,29 @@ final class KernelTest extends TestCase
         return $this->kernel->handle(new Request('GET', '/pesquisa', query: ['termo' => $term]));
     }
 
-    private function register(string $name, string $cpf): Response
+    private function register(string $name, string $cpf, string $state): Response
     {
         return $this->kernel->handle(new Request('POST', '/cidadaos', body: [
             '_token' => $this->session->csrfToken(),
             'name' => $name,
             'cpf' => $cpf,
+            'state' => $state,
         ]));
+    }
+
+    /**
+     * The field is marked as invalid and its help text is replaced by the error.
+     */
+    private function assertFieldError(string $page, string $field, string $message): void
+    {
+        self::assertMatchesRegularExpression(
+            sprintf('/<div class="field field--error[^"]*">\s*<label for="%s">/', $field),
+            $page,
+        );
+        self::assertMatchesRegularExpression(
+            sprintf('/id="%s-message"[^>]*role="alert">\s*%s\s*</', $field, preg_quote(e($message), '/')),
+            $page,
+        );
+        self::assertSame(1, substr_count($page, 'field--error'));
     }
 }

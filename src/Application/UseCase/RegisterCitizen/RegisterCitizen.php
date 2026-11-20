@@ -9,6 +9,8 @@ use App\Domain\Citizen\CitizenRepository;
 use App\Domain\Exception\CitizenAlreadyExistsException;
 use App\Domain\Exception\InvalidCpfException;
 use App\Domain\Exception\InvalidNameException;
+use App\Domain\Exception\InvalidStateException;
+use App\Domain\Shared\ValueObject\BrazilianState;
 use App\Domain\Shared\ValueObject\Cpf;
 use App\Domain\Shared\ValueObject\FullName;
 use DateTimeImmutable;
@@ -20,17 +22,19 @@ final readonly class RegisterCitizen
     /**
      * @throws InvalidNameException
      * @throws InvalidCpfException
+     * @throws InvalidStateException
      * @throws CitizenAlreadyExistsException
      */
     public function handle(RegisterCitizenInput $input): Citizen
     {
         $name = FullName::fromString($input->name);
         $cpf = Cpf::fromString($input->cpf);
+        $state = BrazilianState::fromCode($input->state);
 
         if ($this->citizens->findByCpf($cpf) !== null) {
             throw CitizenAlreadyExistsException::withCpf($cpf);
         }
 
-        return $this->citizens->add(Citizen::register($name, $cpf, new DateTimeImmutable()));
+        return $this->citizens->add(Citizen::register($name, $cpf, $state, new DateTimeImmutable()));
     }
 }

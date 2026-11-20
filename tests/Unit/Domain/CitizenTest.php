@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Domain;
 
 use App\Domain\Citizen\Citizen;
+use App\Domain\Shared\ValueObject\BrazilianState;
 use App\Domain\Shared\ValueObject\Cpf;
 use App\Domain\Shared\ValueObject\FullName;
 use DateTimeImmutable;
@@ -19,6 +20,7 @@ final class CitizenTest extends TestCase
         $citizen = Citizen::register(
             FullName::fromString('Maria Silva'),
             Cpf::fromString('52998224725'),
+            BrazilianState::SP,
             new DateTimeImmutable('2026-01-01 10:00:00'),
         );
 
@@ -28,6 +30,7 @@ final class CitizenTest extends TestCase
         self::assertSame(7, $persisted->id);
         self::assertSame($citizen->name, $persisted->name);
         self::assertSame($citizen->cpf, $persisted->cpf);
+        self::assertSame($citizen->state, $persisted->state);
         self::assertSame($citizen->createdAt, $persisted->createdAt);
     }
 }

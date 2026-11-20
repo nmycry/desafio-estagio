@@ -7,14 +7,20 @@ namespace App\Infrastructure\Persistence;
 use App\Domain\Citizen\Citizen;
 use App\Domain\Citizen\CitizenRepository;
 use App\Domain\Exception\CitizenAlreadyExistsException;
+use App\Domain\Shared\ValueObject\BrazilianState;
 use App\Domain\Shared\ValueObject\Cpf;
 use App\Domain\Shared\ValueObject\FullName;
 use DateTimeImmutable;
 use PDO;
 use PDOException;
 
+/**
+ * @phpstan-type CitizenRow array{id: int, name: string, cpf: string, state: string, created_at: string}
+ */
 final readonly class PdoCitizenRepository implements CitizenRepository
 {
+    private const string SELECT_CITIZENS = 'SELECT id, name, cpf, state, created_at FROM citizens';
+
     private const string DATETIME_FORMAT = 'Y-m-d H:i:s';
 
     private const int MYSQL_DUPLICATE_ENTRY = 1062;
@@ -24,13 +30,14 @@ final readonly class PdoCitizenRepository implements CitizenRepository
     public function add(Citizen $citizen): Citizen
     {
         $statement = $this->pdo->prepare(
-            'INSERT INTO citizens (name, cpf, created_at) VALUES (:name, :cpf, :created_at)',
+            'INSERT INTO citizens (name, cpf, state, created_at) VALUES (:name, :cpf, :state, :created_at)',
         );
 
         try {
             $statement->execute([
                 'name' => $citizen->name->value(),
                 'cpf' => $citizen->cpf->value(),
+                'state' => $citizen->state->value,
                 'created_at' => $citizen->createdAt->format(self::DATETIME_FORMAT),
             ]);
         } catch (PDOException $exception) {
@@ -46,10 +53,10 @@ final readonly class PdoCitizenRepository implements CitizenRepository
 
     public function findByCpf(Cpf $cpf): ?Citizen
     {
-        $statement = $this->pdo->prepare('SELECT id, name, cpf, created_at FROM citizens WHERE cpf = :cpf');
+        $statement = $this->pdo->prepare(self::SELECT_CITIZENS . ' WHERE cpf = :cpf');
         $statement->execute(['cpf' => $cpf->value()]);
 
-        /** @var array{id: int, name: string, cpf: string, created_at: string}|false $row */
+        /** @var CitizenRow|false $row */
         $row = $statement->fetch();
 
         return $row === false ? null : $this->hydrate($row);
@@ -58,11 +65,11 @@ final readonly class PdoCitizenRepository implements CitizenRepository
     public function searchByName(string $term): array
     {
         $statement = $this->pdo->prepare(
-            "SELECT id, name, cpf, created_at FROM citizens WHERE name LIKE :pattern ESCAPE '!' ORDER BY name, id",
+            self::SELECT_CITIZENS . " WHERE name LIKE :pattern ESCAPE '!' ORDER BY name, id",
         );
         $statement->execute(['pattern' => '%' . $this->escapeLike($term) . '%']);
 
-        /** @var list<array{id: int, name: string, cpf: string, created_at: string}> $rows */
+        /** @var list<CitizenRow> $rows */
         $rows = $statement->fetchAll();
 
         return array_map($this->hydrate(...), $rows);
@@ -84,7 +91,7 @@ final readonly class PdoCitizenRepository implements CitizenRepository
     }
 
     /**
-     * @param array{id: int, name: string, cpf: string, created_at: string} $row
+     * @param CitizenRow $row
      */
     private function hydrate(array $row): Citizen
     {
@@ -92,6 +99,7 @@ final readonly class PdoCitizenRepository implements CitizenRepository
             $row['id'],
             FullName::fromString($row['name']),
             Cpf::fromString($row['cpf']),
+            BrazilianState::from($row['state']),
             new DateTimeImmutable($row['created_at']),
         );
     }

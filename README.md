@@ -1,7 +1,7 @@
 # Cadastro de Cidadãos
 
 Aplicação em PHP 8.5 puro (sem framework) para cadastrar cidadãos brasileiros
-(nome completo e CPF) e pesquisá-los por nome ou CPF.
+(nome completo, CPF e estado) e pesquisá-los por nome ou CPF.
 
 ## Requisitos
 
@@ -9,6 +9,10 @@ Aplicação em PHP 8.5 puro (sem framework) para cadastrar cidadãos brasileiros
 - Git, para clonar o repositório.
 
 PHP, Composer e MySQL **não** precisam estar instalados: rodam dentro dos containers.
+
+O navegador precisa de acesso à internet: a lista de estados do formulário vem
+da [API de Localidades do IBGE](https://servicodados.ibge.gov.br/api/docs/localidades)
+e a fonte Inter, do Google Fonts.
 
 ## Como rodar
 
@@ -82,7 +86,8 @@ docker compose exec app composer cs:fix            # aplica as correções de es
   publicada no host: dentro da rede do Docker a aplicação sempre fala com
   `db:3306`.
 - Para resetar o banco (apaga todos os dados e recria o schema na próxima
-  subida):
+  subida). Isso também é necessário quando o schema muda, por exemplo, ao
+  atualizar de uma versão sem a coluna `state`:
 
   ```bash
   docker compose down -v
@@ -100,7 +105,7 @@ docker compose exec app composer cs:fix            # aplica as correções de es
 ```
 src/
   Domain/          regras de negócio puras: Citizen, CitizenRepository (interface),
-                   value objects Cpf e FullName, exceções de domínio
+                   value objects Cpf, FullName e BrazilianState, exceções de domínio
   Application/     casos de uso: RegisterCitizen (+ DTO de entrada) e SearchCitizens
   Infrastructure/  detalhes técnicos: PDO/MySQL, repositório em memória,
                    HTTP (Request, Response, Router, Session), views, config, container
@@ -123,7 +128,15 @@ requisição, estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 - **Value Object:** `Cpf` e `FullName` são imutáveis e validam a si mesmos na
   criação. Um CPF inválido não chega a existir como objeto, então o resto do
   código não precisa revalidar. O CPF é guardado só com dígitos e formatado
-  (`000.000.000-00`) apenas na exibição.
+  (`000.000.000-00`) apenas na exibição. O estado é o enum `BrazilianState`,
+  com as 27 UFs: um conjunto fechado e conhecido de valores é exatamente o caso
+  de uso de um enum.
+- **Lista de estados via IBGE:** o `<select>` de estados é preenchido no
+  navegador pela API de Localidades do IBGE, que é pública, gratuita, dispensa
+  chave e libera CORS. A API só melhora a experiência: o servidor valida a UF
+  enviada contra o enum, então um valor fora da lista nunca é gravado. Se a
+  API estiver fora do ar, o campo mostra um aviso pedindo para recarregar a
+  página.
 - **Repository:** `CitizenRepository` é uma interface do domínio com duas
   implementações. `PdoCitizenRepository` serve a aplicação e os testes de
   integração. `InMemoryCitizenRepository` permite testar os casos de uso sem
@@ -143,10 +156,11 @@ requisição, estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
   `Kernel`, onde ficam o roteamento e o tratamento centralizado de erros. Como
   o `Kernel` é uma classe comum, os testes o exercitam sem servidor HTTP.
 - **Post/Redirect/Get:** depois de um cadastro bem-sucedido, a resposta é um
-  `303` para `/`. A mensagem de sucesso, com nome e CPF formatado, viaja numa
-  flash message na sessão. Recarregar a página não reenvia o formulário.
+  `303` para `/`. A mensagem de sucesso, com nome, CPF formatado e UF, viaja
+  numa flash message na sessão. Recarregar a página não reenvia o formulário.
 - **Tratamento de erros:** exceções de domínio (CPF inválido, nome inválido,
-  duplicidade, busca vazia) viram mensagens amigáveis no próprio formulário.
+  estado inválido, duplicidade, busca vazia) viram mensagens amigáveis exibidas
+  abaixo do campo que causou o erro.
   Erros inesperados são registrados no log e exibidos como uma página 500
   genérica, sem stack trace.
 - **Segurança:**
@@ -157,6 +171,9 @@ requisição, estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
   - As credenciais vêm de variáveis de ambiente.
 - **Validação:** o servidor é a fonte da verdade. O JavaScript repete o mesmo
   algoritmo de CPF apenas para dar feedback enquanto o usuário digita.
+- **Interface:** as abas "Cadastrar" e "Pesquisar" são duas páginas
+  server-side com visual de abas, e não uma troca de painel em JavaScript.
+  Assim a navegação, o PRG e a busca funcionam mesmo sem JS.
 - **Busca:**
   - Um termo com 11 dígitos (com ou sem máscara) é tratado como CPF; qualquer
     outro, como parte do nome.
@@ -179,7 +196,11 @@ requisição, estão em [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 - Busca por nome com índice FULLTEXT, ou por prefixo (`LIKE 'termo%'`), para
   aproveitar índice. O `LIKE '%termo%'` atual não usa o índice em `name`.
 - Testes de ponta a ponta no navegador (por exemplo, com Playwright), cobrindo
-  também a máscara e a validação de CPF em JavaScript.
+  também a máscara de CPF e o carregamento dos estados em JavaScript.
+- Lista de estados renderizada pelo servidor como alternativa quando a API do
+  IBGE ou o JavaScript não estiverem disponíveis.
+- Exibir de uma vez os erros de todos os campos. Hoje o caso de uso para no
+  primeiro erro encontrado.
 - Pipeline de CI rodando testes, PHPStan e PHP-CS-Fixer a cada push.
 - Migrations versionadas no lugar do script único de inicialização.
 - Cabeçalhos de segurança (Content-Security-Policy, X-Frame-Options).

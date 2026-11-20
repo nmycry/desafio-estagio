@@ -23,9 +23,9 @@ final class SearchCitizensTest extends TestCase
         $citizens = new InMemoryCitizenRepository();
         $registerCitizen = new RegisterCitizen($citizens);
 
-        $registerCitizen->handle(new RegisterCitizenInput('Maria Silva', '52998224725'));
-        $registerCitizen->handle(new RegisterCitizenInput('Ana Silveira', '11144477735'));
-        $registerCitizen->handle(new RegisterCitizenInput('João Souza', '10000000108'));
+        $registerCitizen->handle(new RegisterCitizenInput('Maria Silva', '52998224725', 'SP'));
+        $registerCitizen->handle(new RegisterCitizenInput('Ana Silveira', '11144477735', 'MG'));
+        $registerCitizen->handle(new RegisterCitizenInput('João Souza', '10000000108', 'BA'));
 
         $this->searchCitizens = new SearchCitizens($citizens);
     }

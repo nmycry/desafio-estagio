@@ -9,6 +9,8 @@ use App\Application\UseCase\RegisterCitizen\RegisterCitizenInput;
 use App\Domain\Exception\CitizenAlreadyExistsException;
 use App\Domain\Exception\InvalidCpfException;
 use App\Domain\Exception\InvalidNameException;
+use App\Domain\Exception\InvalidStateException;
+use App\Domain\Shared\ValueObject\BrazilianState;
 use App\Domain\Shared\ValueObject\Cpf;
 use App\Infrastructure\Persistence\InMemoryCitizenRepository;
 use PHPUnit\Framework\Attributes\Test;
@@ -29,22 +31,23 @@ final class RegisterCitizenTest extends TestCase
     #[Test]
     public function itRegistersACitizen(): void
     {
-        $citizen = $this->registerCitizen->handle(new RegisterCitizenInput('  Maria   Silva ', '529.982.247-25'));
+        $citizen = $this->registerCitizen->handle(new RegisterCitizenInput('  Maria   Silva ', '529.982.247-25', 'sp'));
 
         self::assertNotNull($citizen->id);
         self::assertSame('Maria Silva', $citizen->name->value());
         self::assertSame('52998224725', $citizen->cpf->value());
+        self::assertSame(BrazilianState::SP, $citizen->state);
         self::assertEquals($citizen, $this->citizens->findByCpf(Cpf::fromString('52998224725')));
     }
 
     #[Test]
     public function itRejectsADuplicatedCpf(): void
     {
-        $this->registerCitizen->handle(new RegisterCitizenInput('Maria Silva', '52998224725'));
+        $this->registerCitizen->handle(new RegisterCitizenInput('Maria Silva', '52998224725', 'SP'));
 
         $this->expectExceptionObject(CitizenAlreadyExistsException::withCpf(Cpf::fromString('52998224725')));
 
-        $this->registerCitizen->handle(new RegisterCitizenInput('João Souza', '529.982.247-25'));
+        $this->registerCitizen->handle(new RegisterCitizenInput('João Souza', '529.982.247-25', 'RJ'));
     }
 
     #[Test]
@@ -52,7 +55,7 @@ final class RegisterCitizenTest extends TestCase
     {
         $this->expectException(InvalidCpfException::class);
 
-        $this->registerCitizen->handle(new RegisterCitizenInput('Maria Silva', '111.111.111-11'));
+        $this->registerCitizen->handle(new RegisterCitizenInput('Maria Silva', '111.111.111-11', 'SP'));
     }
 
     #[Test]
@@ -60,6 +63,14 @@ final class RegisterCitizenTest extends TestCase
     {
         $this->expectException(InvalidNameException::class);
 
-        $this->registerCitizen->handle(new RegisterCitizenInput('Maria', '52998224725'));
+        $this->registerCitizen->handle(new RegisterCitizenInput('Maria', '52998224725', 'SP'));
+    }
+
+    #[Test]
+    public function itRejectsAnInvalidState(): void
+    {
+        $this->expectException(InvalidStateException::class);
+
+        $this->registerCitizen->handle(new RegisterCitizenInput('Maria Silva', '52998224725', ''));
     }
 }

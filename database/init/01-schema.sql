@@ -15,6 +15,7 @@ CREATE TABLE citizens.citizens (
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     name VARCHAR(150) NOT NULL,
     cpf CHAR(11) NOT NULL,
+    state CHAR(2) NOT NULL,
     created_at DATETIME NOT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uq_citizens_cpf (cpf),
